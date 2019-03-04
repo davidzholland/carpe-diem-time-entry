@@ -1,0 +1,2 @@
+dotenv==0.0.5
+python-dateutil==2.6.1

@@ -71,7 +71,7 @@ def human_date(date):
     return date.strftime('%a, %b') + ' ' + date.strftime('%d').lstrip('0')
 
 
-def submit_time_entries():
+def prepare_entries_queue():
     entries_queue = []
     print('Opening dialog where you can choose the CSV to import...')
     Tk().withdraw()
@@ -83,27 +83,32 @@ def submit_time_entries():
                 entry_date = parser.parse(entry['Date'])
                 if (entry_date >= from_date and entry_date <= to_date):
                     entries_queue.append(entry)
-
     if len(entries_queue) <= 0:
         print("No entries found for " + str(from_date))
         exit()
-
     #print("Preview: ")
     #for entry in entries_queue:
     #    print(entry)
-
     display_queue_summary(entries_queue)
-
     entries_queue = combine_daily_matter_entries(entries_queue)
+    return entries_queue
 
+
+def submit_time_entries():
+    entries_queue = prepare_entries_queue()
     print("Entries to submit: " + str(len(entries_queue)))
+    error_count = 0
     if confirm("Would you like to proceed?"):
         print("Submitting...")
         for entry in entries_queue:
-            submit_time_entry(entry)
+            if False == submit_time_entry(entry):
+                error_count += 1
             time.sleep(submission_delay)
-        print("Your time has been staged")
-        warn("ACTION REQUIRED: Time entries are not yet closed. Please close your time via Carpe Diem")
+        if error_count > 0:
+            warn("There was an issue submitting the time entries. Please review any errors above and correct any issues in Carpe Diem.")
+        else:
+            "Your time has been staged"
+            warn("ACTION REQUIRED: Time entries are staged, but not yet closed. Please close your time via Carpe Diem")
 
 
 def display_queue_summary(entries_queue):
@@ -213,11 +218,18 @@ def submit_time_entry(entry):
     data_string = prepare_data_string(entry)
 
     # submit request
-    req = urllib2.Request(env['url'], data_string, headers)
-    f = urllib2.urlopen(req)
-    for x in f:
-        print(x)
-    f.close()
+    try:
+        req = urllib2.Request(env['url'], data_string, headers)
+        f = urllib2.urlopen(req)
+        for x in f:
+            print(x)
+        f.close()
+    except urllib2.HTTPError as e:
+        print 'Submission failed with error code - %s.' % e.code
+        error_message = e.read()
+        print error_message
+        # print e.message
+        return False
 
 
 def prepare_headers():

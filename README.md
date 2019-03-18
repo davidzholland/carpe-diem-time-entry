@@ -1,11 +1,17 @@
 ## Prerequisites
 
 * Python 2.x
+   * Download and install from python.org
+   * On Windows, ensure the install location (e.g. `;C:\Python27`) is added to your PATH environment variable. E.g. https://geek-university.com/python/add-python-to-the-windows-path/
 * Pip
+   * Follow the instructions at: https://pip.pypa.io/en/stable/installing/
+   * On Windows, ensure the install location (e.g. `;C:\Python27\Scripts`) is added to your PATH environment variable.
+* TKinter
+   * Follow the instructions to install Tk at: https://tkdocs.com/tutorial/install.html
 
 ## Setup
 
-1. Clone the repository
+1. Clone the repository or download and extract the Zip archive
 
     ```bash
     git clone <repo-url e.g. user@url>

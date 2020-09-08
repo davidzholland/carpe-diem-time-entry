@@ -1,22 +1,22 @@
 import os
-from dotenv import Dotenv
-from Tkinter import Tk
-from tkFileDialog import askopenfilename
+from dotenv import load_dotenv
+import tkinter as tk
+from tkinter import filedialog
 import csv
 import json
 import urllib
 import uuid
 import time
 import datetime
-from urlparse import urlparse
-from httplib import HTTPConnection
+from urllib.parse import urlparse
 from dateutil import parser
-import urllib2
+import requests
 import math
 from decimal import Decimal
 
+# Load the .env configuration
+load_dotenv()
 
-env = {}
 from_date = ""
 to_date = ""
 submission_delay = .1
@@ -27,9 +27,7 @@ print_styles = {
 default_max_hours_per_entry = 4
 
 def import_time():
-    global env
     warn('WARNING: USE AT YOUR OWN RISK. BY PROCEEDING YOU ACKNOWLEDGE THIS SOFTWARE IS EXPERIMENTAL AND FOR TESTING ONLY')
-    env = get_environment_variables()
     set_date_range()
     submit_time_entries()
 
@@ -52,7 +50,7 @@ def get_from_date():
     else:
         last_monday = today - datetime.timedelta(days=today.weekday())
     example_date_input = human_date(last_monday)
-    user_date = raw_input('From date: (i.e. ' + example_date_input + '): ')
+    user_date = input('From date: (i.e. ' + example_date_input + '): ')
     if "" == user_date:
         user_date = example_date_input
     return parser.parse(user_date)
@@ -61,7 +59,7 @@ def get_from_date():
 def get_to_date():
     today = datetime.date.today()
     example_date_input = human_date(today)
-    user_date = raw_input('To date: (i.e. ' + example_date_input + '): ')
+    user_date = input('To date: (i.e. ' + example_date_input + '): ')
     if "" == user_date:
         user_date = example_date_input
     return parser.parse(user_date)
@@ -74,9 +72,10 @@ def human_date(date):
 def prepare_entries_queue():
     entries_queue = []
     print('Opening dialog where you can choose the CSV to import...')
-    Tk().withdraw()
-    file_path = askopenfilename(defaultextension=".csv", filetypes=(("CSV file", "*.csv"),("All Files", "*.*") ))
-    with open( file_path, "rb" ) as theFile:
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(defaultextension=".csv", filetypes=(("CSV file", "*.csv"),("All Files", "*.*") ))
+    with open( file_path, "r" ) as theFile:
         reader = csv.DictReader( theFile )
         for entry in reader:
             if 'Date' in entry and '' != entry['Date']:
@@ -156,7 +155,7 @@ def combine_daily_matter_entries(entries_queue):
             if entry['Description'] not in combined_entries[combined_key]['Description']:
                 combined_entries[combined_key]['Description'] += '; ' + entry['Description']
     # Format into a list
-    for key, value in combined_entries.iteritems():
+    for key, value in combined_entries.items():
         response.append(value)
     return response
 
@@ -205,35 +204,27 @@ def get_total_hours(entries_queue):
 
 
 def confirm(question):
-    response = raw_input(question + " [y/n] ")
+    response = input(question + " [y/n] ")
     return response.lower() in ["y", ""]
-
-
-def get_environment_variables():
-    return Dotenv(os.path.join('.env'))
 
 
 def submit_time_entry(entry):
     headers = prepare_headers()
-    data_string = prepare_data_string(entry)
+    data = prepare_data(entry)
 
     # submit request
     try:
-        req = urllib2.Request(env['url'], data_string, headers)
-        f = urllib2.urlopen(req)
-        for x in f:
-            print(x)
-        f.close()
-    except urllib2.HTTPError as e:
-        print 'Submission failed with error code - %s.' % e.code
+        result = requests.post(os.getenv('url'), data=data, headers=headers)
+        print('result: ', result.text)
+    except requests.exceptions.RequestException as e:
+        print('Submission failed with error code - %s.' % e.code)
         error_message = e.read()
-        print error_message
-        # print e.message
+        print(error_message)
         return False
 
 
 def prepare_headers():
-    parsed_url = urlparse(env['url'])
+    parsed_url = urlparse(os.getenv('url'))
     return {
         'Host': parsed_url.hostname,
         'Accept': '*/*',
@@ -242,19 +233,25 @@ def prepare_headers():
     }
 
 
-def prepare_data_string(entry):
+def prepare_data(entry):
+    data = {}
     hours = format_hours( entry['Hours'] )
     info = format_info(entry)
     date = format_date(entry['Date'])
-    data_string = 'svc=add'
-    data_string += '&info=' + info
-    data_string += '&hour=' + str(hours)
-    data_string += '&id=' + env['id']
-    data_string += '&tbcl=N&udid=' + env['udid']
-    data_string += '&date=' + date + '&key=' + env['key'] + '&guid=' + str(uuid.uuid4()).upper()
-    data_string += '&desc=' + urllib.quote(entry['Description'])
-    data_string += '&dev=' + urllib.quote(env['dev'])
-    return data_string
+    data = {
+        'svc': 'add',
+        'info': info,
+        'hour': str(hours),
+        'id': os.getenv('id'),
+        'tbcl': 'N',
+        'udid': os.getenv('udid'),
+        'date': date,
+        'key': os.getenv('key'),
+        'guid': str(uuid.uuid4()).upper(),
+        'desc': entry['Description'],
+        'dev': os.getenv('dev')
+    }
+    return data
 
 
 def format_hours(hours):
@@ -264,10 +261,10 @@ def format_hours(hours):
 def format_info(entry):
     client = format_client( entry['Client'] )
     matter = format_matter( entry['Matter Code'] )
-    info = urllib.quote("|Client=" + client)
-    info += ";" + urllib.quote("Matter=" + matter)
-    info += ";" + urllib.quote("Jurisdiction=" + entry['Jurisdiction'])
-    info += ";" + urllib.quote("Task Code=" + entry['Task Code'])
+    info = "|Client=" + client
+    info += ";" + "Matter=" + matter
+    info += ";" + "Jurisdiction=" + entry['Jurisdiction']
+    info += ";" + "Task Code=" + entry['Task Code']
     return info
 
 
@@ -281,7 +278,7 @@ def format_matter(matter):
 
 def format_date(date, format = "%Y/%m/%d"):
     return parser.parse(date).strftime(format)
-    
+
 def warn(message, severity = 1, borders = True):
     color_sequence = CLIColorSequences.failure if severity > 1 else CLIColorSequences.warning
     print_message(message, color_sequence, borders)

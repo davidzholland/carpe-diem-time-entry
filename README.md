@@ -1,26 +1,34 @@
 ## Prerequisites
 
-* Python 2.x
+* Python 3 & Pip
    * Download and install from python.org
-   * On Windows, ensure the install location (e.g. `;C:\Python27`) is added to your PATH environment variable. E.g. https://geek-university.com/python/add-python-to-the-windows-path/
-* Pip
-   * Follow the instructions at: https://pip.pypa.io/en/stable/installing/
-   * On Windows, ensure the install location (e.g. `;C:\Python27\Scripts`) is added to your PATH environment variable.
+   * On Windows, ensure the install location (e.g. `;C:\Python37`) is added to your PATH environment variable. E.g. https://geek-university.com/python/add-python-to-the-windows-path/
 * TKinter
    * Follow the instructions to install Tk at: https://tkdocs.com/tutorial/install.html
+   * On OSX with pyenv you may need to reinstall python with tkinter environment vars as:
+      * `brew install python --with-tcl-tk`
+      * `PYTHON_CONFIGURE_OPTS="--with-tcltk-includes='-I/usr/local/opt/tcl-tk/include' --with-tcltk-libs='-L/usr/local/opt/tcl-tk/lib -ltcl8.6 -ltk8.6'" pyenv install 3.7.4`
+* virtualenv
+   * `pip install virtualenv`
 
 ## Setup
 
 1. Clone the repository or download and extract the Zip archive
 
     ```bash
-    git clone <repo-url e.g. user@url>
+    git clone https://github.com/davidzholland/carpe-diem-time-entry
     ```
-    
+
+1. Use a virtual environment to isolate dependencies for this project from your local system.
+   ```bash
+   virtualenv venv
+   source venv/bin/activate
+   ```
+
 1. Install the dependencies
 
-    ```bash  
-    pip install -r requirements.txt --user
+    ```bash
+    pip install -r requirements.txt
     ```
 
 1. Get your Carpe Diem user details and secret

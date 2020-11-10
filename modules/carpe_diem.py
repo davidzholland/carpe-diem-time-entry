@@ -13,6 +13,8 @@ from dateutil import parser
 import requests
 import math
 from decimal import Decimal
+import hmac
+import jwt
 
 # Load the .env configuration
 load_dotenv()
@@ -42,52 +44,9 @@ default_max_hours_per_entry = 4
 
 def import_time():
     warn('WARNING: USE AT YOUR OWN RISK. BY PROCEEDING YOU ACKNOWLEDGE THIS SOFTWARE IS EXPERIMENTAL AND FOR TESTING ONLY')
-    # testGET()
-    # testPOST()
     set_app()
     set_date_range()
     submit_time_entries()
-
-def testGET():
-     # TODO: Remove this method
-    headers = {
-        "accept": "application/json",
-        "Authorization": "Bearer " + access_token
-    }
-    url = 'https://tik-prd-usc-cd-cdweb-apiapp.azurewebsites.net/api/MonthView/Month/2020-11-01T00:00:00.000/Tkpr/21335'
-    result = requests.get(url, headers=headers)
-    print('test result: ', result)
-    print('test result.text: ', result.text)
-    print('test result.headers: ', result.headers)
-    print('test result.status_code: ', result.status_code)
-
-def testPOST():
-     # TODO: Remove this method
-    data = {"timekeeperId":"21335","startTime":"2020-11-03T08:00:00.000","endTime":"2020-11-03T16:00:00.000","offset":-6,"bestMatch":True,"overlapping":False,"exclusions":False}
-    headers = {
-        "Connection": "keep-alive",
-        "Pragma": "no-cache",
-        "Cache-Control": "no-cache",
-        "accept": "application/json",
-        "Authorization": "Bearer " + access_token,
-        "Delta": "ea33c7f05fffc88a2937de888a2c4ca7",
-        # "Delta": uuid.uuid4().hex,
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
-        "content-type": "application/json",
-        "Origin": "https://us.carpe.tikit.com",
-        "Sec-Fetch-Site": "cross-site",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty",
-        "Referer": "https://us.carpe.tikit.com/",
-        "Accept-Language": "en-US,en;q=0.9,fr;q=0.8,zh-CN;q=0.7,zh;q=0.6,ja;q=0.5,af;q=0.4"
-    }
-    url = 'https://tik-prd-usc-cd-cdweb-apiapp.azurewebsites.net/api/TimeFinder/GetTimekeeperActivitiesCount'
-    result = requests.post(url, headers=headers, data=data)
-    print('test result: ', result)
-    print('test result.text: ', result.text)
-    print('test result.headers: ', result.headers)
-    print('test result.status_code: ', result.status_code)
-    exit()
 
 def set_app():
     global selected_app
@@ -292,22 +251,18 @@ def prepare_headers(data, url):
         }
     else:
         return {
-            "Connection": "keep-alive",
-            "Pragma": "no-cache",
-            "Cache-Control": "no-cache",
             "accept": "application/json",
-            "Authorization": "Bearer " + access_token,
-            "Delta": "ea33c7f05fffc88a2937de888a2c4ca7",
-            # "Delta": uuid.uuid4().hex, # TODO: Determine how to generate correct Delta
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
-            "content-type": "application/json",
-            "Origin": "https://us.carpe.tikit.com",
-            "Sec-Fetch-Site": "cross-site",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Dest": "empty",
             "Referer": "https://us.carpe.tikit.com/",
-            "Accept-Language": "en-US,en;q=0.9,fr;q=0.8,zh-CN;q=0.7,zh;q=0.6,ja;q=0.5,af;q=0.4"
+            "Authorization": "Bearer " + access_token,
+            "Delta": generate_delta(data),
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
+            "content-type": "application/json"
         }
+
+def generate_delta(data):
+    decoded_token = jwt.decode(access_token, verify=False)
+    secret_passphrase = str(decoded_token['nbf']) + decoded_token['unique_name'] + "CarpeDiem"
+    return hmac.new(secret_passphrase.encode('utf-8'), data.encode('utf-8'), 'MD5').hexdigest()
 
 def prepare_data(entry):
     data = {}
@@ -347,11 +302,11 @@ def prepare_data(entry):
                 "billableOverriden": "0",
                 "tempWorklistId": "",
                 "rawTime": hours * 60 * 60, # Seconds
-                "roundTime": hours * 60 * 60, # Seconds
+                "roundTime": round(hours * 60 * 60), # Seconds
                 "otherTime": 0,
                 "remainingRawTime": 0,
                 "remainingRoundTime": 0,
-                "roundTimeDisplayValue": str(hours),
+                "roundTimeDisplayValue": str('%.2f' % hours),
                 "rawTimeDisplayValue": str_timedelta(datetime.timedelta(hours=hours)),
                 "spellChecked": 0,
                 "timeId": "",
@@ -370,7 +325,6 @@ def prepare_data(entry):
                 "isTimerRunning": False,
                 "userAddedFields": {},
                 "roundingValue": 6,
-                "matterLanguage": "",
                 "userCodes": {
                     # "Code1": entry['Task Code'], # Optional
                     "Code4": entry['Jurisdiction']
@@ -398,10 +352,9 @@ def prepare_data(entry):
                 "ignoreMixedDigits": False,
                 "spellCheckAddEdit": False
             },
-            "defaultLangForSpellCheck": "en-US",
-            "matterLanguage": ""
+            "defaultLangForSpellCheck": "en-US"
         }
-        data = json.dumps(data)
+        data = json.dumps(data, separators=(',', ':'))  # Separators are important in generating Delta
     return data
 
 def str_timedelta(td):

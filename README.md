@@ -72,6 +72,7 @@
 1. From a terminal, enter the command below and follow the instructions/prompts.
     
     ``` 
+    source venv/bin/activate
     python import.py
     ```
 

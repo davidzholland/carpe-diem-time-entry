@@ -119,7 +119,6 @@ def submit_time_entries():
         for entry in entries_queue:
             if False == submit_time_entry(entry):
                 error_count += 1
-            exit() # TODO: Remove
             time.sleep(submission_delay)
         if error_count > 0:
             warn("There was an issue submitting the time entries. Please review any errors above and correct any issues in Carpe Diem.")
@@ -224,16 +223,11 @@ def submit_time_entry(entry):
     headers = prepare_headers(data, url)
     # submit request
     try:
-        print('url: ', url)
-        print('data: ', type(data), data)
-        print('headers: ', headers)
-        # exit() TODO: Remove this after development is completed
         result = requests.post(url, data=data, headers=headers)
-        print('result: ', result.text)
-        print('raw: ', result.raw)
-        print('headers: ', result.headers)
-        print('result: ', result)
-        print('status_code: ', result.status_code)
+        if result.status_code == 200:
+            print('Success staging entry: ', result.json()['timeID'])
+        else:
+            print('There was a problem submitting the entry: ', result.status_code, result.text)
     except requests.exceptions.RequestException as e:
         print('Submission failed with error code - %s.' % e.code)
         error_message = e.read()
@@ -326,7 +320,7 @@ def prepare_data(entry):
                 "userAddedFields": {},
                 "roundingValue": 6,
                 "userCodes": {
-                    # "Code1": entry['Task Code'], # Optional
+                    "Code1": entry['Task Code'], # Optional
                     "Code4": entry['Jurisdiction']
                 },
                 "userCodeIdDesc": {

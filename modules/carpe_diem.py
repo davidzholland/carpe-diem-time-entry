@@ -21,6 +21,7 @@ import readline
 
 
 REQUIRED_HOURS_PER_WEEKDAY = 8
+STATUS_TRANSFERRED = '4'
 # Load the .env configuration
 load_dotenv()
 
@@ -51,26 +52,34 @@ default_max_hours_per_entry = 4
 def import_time():
     warn('WARNING: USE AT YOUR OWN RISK. BY PROCEEDING YOU ACKNOWLEDGE THIS SOFTWARE IS EXPERIMENTAL AND FOR TESTING ONLY')
     set_app()
-    analyze_prior_month_entries()
+    analyze_existing_entries()
     set_date_range()
     submit_time_entries()
 
-def analyze_prior_month_entries():
-    missing_entry_dates = []
+def analyze_existing_entries():
+    # Analyze prior month
     last_month_date = get_last_day_of_prior_month()
-    prior_month_first_day, prior_month_last_day = get_month_day_range(last_month_date)
-    weekdays = get_weekdays(prior_month_first_day, prior_month_last_day)
-    month_totals = get_month_totals(prior_month_first_day)
+    analyze_month_entries(last_month_date)
+    # Analyze current month
+    today = datetime.date.today()
+    analyze_month_entries(today)
+
+def analyze_month_entries(end_date):
+    missing_entry_dates = []
+    start_date = end_date.replace(day = 1)
+    weekdays = get_weekdays(start_date, end_date)
+    totals = get_month_totals(start_date)
+    transferred_totals = [i for i in totals if i['status'] == STATUS_TRANSFERRED]
     for weekday in weekdays:
-        day_entries = [i for i in month_totals if i['dateWorked'] == weekday.strftime('%Y-%m-%dT00:00:00')]
+        day_entries = [i for i in transferred_totals if i['dateWorked'] == weekday.strftime('%Y-%m-%dT00:00:00')]
         day_total_seconds = sum(i['dateTotal'] for i in day_entries)
         day_total_hours = (day_total_seconds / 60) / 60
         if day_total_hours < REQUIRED_HOURS_PER_WEEKDAY:
             missing_entry_dates.append(weekday.strftime('%Y-%m-%d'))
     if len(missing_entry_dates) > 0:
-        warn('WARNING: Prior month is missing hours for: ' + str(missing_entry_dates))
+        warn('WARNING: ' + end_date.strftime('%B') + ' is missing hours for: ' + str(missing_entry_dates))
     else:
-        success('Prior month looks good!')
+        success(end_date.strftime('%B') + ' looks good!')
 
 def get_month_totals(date):
     url = app_configs[selected_app]['endpoints']['view-month'].format(date.strftime('%Y-%m-%d') + 'T00:00:00.000', os.getenv('timekeeperId'))

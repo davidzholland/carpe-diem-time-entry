@@ -17,6 +17,7 @@ import hmac
 import jwt
 import timeago
 import calendar
+import readline
 
 
 REQUIRED_HOURS_PER_WEEKDAY = 8
@@ -37,7 +38,7 @@ app_configs = {
     }
 }
 selected_app = None
-access_token = os.getenv('accessToken')
+access_token = None
 from_date = ""
 to_date = ""
 submission_delay = .1
@@ -49,9 +50,6 @@ default_max_hours_per_entry = 4
 
 def import_time():
     warn('WARNING: USE AT YOUR OWN RISK. BY PROCEEDING YOU ACKNOWLEDGE THIS SOFTWARE IS EXPERIMENTAL AND FOR TESTING ONLY')
-    if is_access_token_valid() == False:
-        print('Please update the access token in the .env file and try again.')
-        exit()
     set_app()
     analyze_prior_month_entries()
     set_date_range()
@@ -123,7 +121,15 @@ def get_month_day_range(date):
 
 def set_app():
     global selected_app
+    global access_token
+    # Hard-code selection for now
     selected_app = 'cd_web'
+    if selected_app == 'cd_web':
+        print('Copy your access token from your browser\'s session parameter "authorizationData_CarpeWeb".')
+        access_token = input('Access token: ').replace('"', '')
+        if is_access_token_valid() == False:
+            print('Please update the access token in the .env file and try again.')
+            exit()
 
 def set_date_range():
     global from_date

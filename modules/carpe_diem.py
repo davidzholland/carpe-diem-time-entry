@@ -358,7 +358,12 @@ def get_common_headers(url):
         }
 
 def is_access_token_valid():
-    decoded_token = jwt.decode(access_token, verify=False)
+    try:
+        decoded_token = jwt.decode(access_token, verify=False)
+    except Exception as e:
+        warn('Unable to decode token: ' + str(e), severity=2)
+        print('Please double check the token and try again.')
+        exit()
     time_diff = decoded_token['exp'] - time.time()
     dt_object = datetime.datetime.fromtimestamp(decoded_token['exp'])
     verb = 'expires' if time_diff > 0 else 'expired'

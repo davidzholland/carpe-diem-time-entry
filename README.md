@@ -31,7 +31,7 @@
     pip install -r requirements.txt
     ```
 
-1. For Carpe Diem Desktop, get your Carpe Diem user details and secret. You can skip this step if using Carpe Diem Web.
+1. If using Carpe Diem Desktop, you'll need to find your Carpe Diem user details and secret. You can skip this step if using Carpe Diem Web.
 
     Copy `.env.example` to `.env` (hint: `cp .env.example .env`). Replace the placeholders within `.env`, including the `<` `>` characters with the values derived from the steps below. Add your timekeeper Id as `timekeeperId` and your name to `name` as `JOHN.SMITH`. Ensure the last line is blank.
     
@@ -68,6 +68,7 @@
 1. If using Carpe Diem Web, get a temporary access token.
    1. Log into the CD Web site in your browser.
    2. Open your browser's developer tools/console and copy `authorizationData_CarpeWeb` from the session storage.
+   3. Paste the access token into the `.env` file as the value for the `accessToken` key.
 
 1. From a terminal, enter the command below and follow the instructions/prompts.
     

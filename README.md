@@ -68,7 +68,7 @@
 1. If using Carpe Diem Web, get a temporary access token.
    1. Log into the CD Web site in your browser.
    2. Open your browser's developer tools/console and copy `authorizationData_CarpeWeb` from the session storage.
-   3. Paste the access token into the `.env` file as the value for the `accessToken` key.
+   3. Then, follow the instructions below and paste the token in when prompted.
 
 1. From a terminal, enter the command below and follow the instructions/prompts.
     

@@ -16,19 +16,23 @@ from decimal import Decimal
 import hmac
 import jwt
 import timeago
+import calendar
 
+
+REQUIRED_HOURS_PER_WEEKDAY = 8
 # Load the .env configuration
 load_dotenv()
 
 app_configs = {
     'cd_web': {
         'endpoints': {
-            'add': 'https://tik-prd-usc-cd-cdweb-apiapp.azurewebsites.net/api/TimeEntry/AddTimeEntry'
+            'submit': 'https://tik-prd-usc-cd-cdweb-apiapp.azurewebsites.net/api/TimeEntry/AddTimeEntry',
+            'view-month': 'https://tik-prd-usc-cd-cdweb-apiapp.azurewebsites.net/api/MonthView/Month/{0}/Tkpr/{1}'
         }
     },
     'cd_desktop': {
         'endpoints': {
-            'add': 'https://cdmobile.fticonsulting.com/cdmobile/TimeKMSV.asp'
+            'submit': 'https://cdmobile.fticonsulting.com/cdmobile/TimeKMSV.asp'
         }
     }
 }
@@ -49,8 +53,73 @@ def import_time():
         print('Please update the access token in the .env file and try again.')
         exit()
     set_app()
+    analyze_prior_month_entries()
     set_date_range()
     submit_time_entries()
+
+def analyze_prior_month_entries():
+    missing_entry_dates = []
+    last_month_date = get_last_day_of_prior_month()
+    prior_month_first_day, prior_month_last_day = get_month_day_range(last_month_date)
+    weekdays = get_weekdays(prior_month_first_day, prior_month_last_day)
+    month_totals = get_month_totals(prior_month_first_day)
+    for weekday in weekdays:
+        day_entries = [i for i in month_totals if i['dateWorked'] == weekday.strftime('%Y-%m-%dT00:00:00')]
+        day_total_seconds = sum(i['dateTotal'] for i in day_entries)
+        day_total_hours = (day_total_seconds / 60) / 60
+        if day_total_hours < REQUIRED_HOURS_PER_WEEKDAY:
+            missing_entry_dates.append(weekday.strftime('%Y-%m-%d'))
+    if len(missing_entry_dates) > 0:
+        warn('WARNING: Prior month is missing hours for: ' + str(missing_entry_dates))
+    else:
+        success('Prior month looks good!')
+
+def get_month_totals(date):
+    url = app_configs[selected_app]['endpoints']['view-month'].format(date.strftime('%Y-%m-%d') + 'T00:00:00.000', os.getenv('timekeeperId'))
+    headers = get_view_headers(url)
+    try:
+        result = requests.get(url, headers=headers)
+        if result.status_code == 200:
+            return result.json()
+        else:
+            print('There was a problem fetching: ', result.status_code, result.text)
+    except requests.exceptions.RequestException as e:
+        print('Fetching failed with error code - %s.' % e.code)
+        error_message = e.read()
+        print(error_message)
+        return False
+
+def get_weekdays(start, end, excluded=(6, 7)):
+    days = []
+    first_day = start
+    while first_day <= end:
+        if first_day.isoweekday() not in excluded:
+            days.append(first_day)
+        first_day += datetime.timedelta(days=1)
+    return days
+
+def get_last_day_of_prior_month():
+    today = datetime.date.today()
+    first = today.replace(day=1)
+    return first - datetime.timedelta(days=1)
+
+def get_month_day_range(date):
+    """
+    For a date 'date' returns the start and end date for the month of 'date'.
+
+    Month with 31 days:
+    >>> date = datetime.date(2011, 7, 27)
+    >>> get_month_day_range(date)
+    (datetime.date(2011, 7, 1), datetime.date(2011, 7, 31))
+
+    Month with 28 days:
+    >>> date = datetime.date(2011, 2, 15)
+    >>> get_month_day_range(date)
+    (datetime.date(2011, 2, 1), datetime.date(2011, 2, 28))
+    """
+    first_day = date.replace(day = 1)
+    last_day = date.replace(day = calendar.monthrange(date.year, date.month)[1])
+    return first_day, last_day
 
 def set_app():
     global selected_app
@@ -220,9 +289,9 @@ def confirm(question):
     return response.lower() in ["y", ""]
 
 def submit_time_entry(entry):
-    url = app_configs[selected_app]['endpoints']['add']
+    url = app_configs[selected_app]['endpoints']['submit']
     data = prepare_data(entry)
-    headers = prepare_headers(data, url)
+    headers = get_submit_headers(data, url)
     # submit request
     try:
         result = requests.post(url, data=data, headers=headers)
@@ -236,7 +305,20 @@ def submit_time_entry(entry):
         print(error_message)
         return False
 
-def prepare_headers(data, url):
+def get_submit_headers(data, url):
+    headers = get_common_headers(url)
+    if selected_app == 'cd_web':
+        headers['Delta'] = generate_delta(data)
+        headers['content-type'] = 'application/json'
+    return headers
+
+def get_view_headers(url):
+    headers = get_common_headers(url)
+    if selected_app == 'cd_web':
+        headers['Cache-Control'] = 'application/json'
+    return headers
+
+def get_common_headers(url):
     parsed_url = urlparse(url)
     if selected_app == 'cd_desktop':
         return {
@@ -250,9 +332,7 @@ def prepare_headers(data, url):
             "accept": "application/json",
             "Referer": "https://us.carpe.tikit.com/",
             "Authorization": "Bearer " + access_token,
-            "Delta": generate_delta(data),
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
-            "content-type": "application/json"
         }
 
 def is_access_token_valid():

@@ -57,12 +57,16 @@ def import_time():
     submit_time_entries()
 
 def analyze_existing_entries():
+    global from_date
     # Analyze prior month
     last_month_date = get_last_day_of_prior_month()
     analyze_month_entries(last_month_date)
     # Analyze current month
     today = datetime.date.today()
-    analyze_month_entries(today)
+    missing_entry_dates = analyze_month_entries(today)
+    # Set default submission start date to earliest current month date with missing entries
+    if len(missing_entry_dates) > 0:
+        from_date = min(missing_entry_dates)
 
 def analyze_month_entries(end_date):
     missing_entry_dates = []
@@ -75,11 +79,13 @@ def analyze_month_entries(end_date):
         day_total_seconds = sum(i['dateTotal'] for i in day_entries)
         day_total_hours = (day_total_seconds / 60) / 60
         if day_total_hours < REQUIRED_HOURS_PER_WEEKDAY:
-            missing_entry_dates.append(weekday.strftime('%Y-%m-%d'))
+            missing_entry_dates.append(weekday)
     if len(missing_entry_dates) > 0:
-        warn('WARNING: ' + end_date.strftime('%B') + ' is missing hours for: ' + str(missing_entry_dates))
+        formatted_missing_entry_dates = [i.strftime('%Y-%m-%d') for i in missing_entry_dates]
+        warn('WARNING: ' + end_date.strftime('%B') + ' is missing hours for: ' + str(formatted_missing_entry_dates))
     else:
         success(end_date.strftime('%B') + ' looks good!')
+    return missing_entry_dates
 
 def get_month_totals(date):
     url = app_configs[selected_app]['endpoints']['view-month'].format(date.strftime('%Y-%m-%d') + 'T00:00:00.000', os.getenv('timekeeperId'))
@@ -151,12 +157,13 @@ def set_date_range():
         exit()
 
 def get_from_date():
+    global from_date
     today = datetime.date.today()
     if today.weekday() == 0:
         last_monday = today - datetime.timedelta(days=7)
     else:
         last_monday = today - datetime.timedelta(days=today.weekday())
-    example_date_input = human_date(last_monday)
+    example_date_input = human_date(from_date) if from_date else human_date(last_monday)
     user_date = input('From date: (i.e. ' + example_date_input + '): ')
     if "" == user_date:
         user_date = example_date_input

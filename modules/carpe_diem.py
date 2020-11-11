@@ -15,6 +15,7 @@ import math
 from decimal import Decimal
 import hmac
 import jwt
+import timeago
 
 # Load the .env configuration
 load_dotenv()
@@ -44,6 +45,9 @@ default_max_hours_per_entry = 4
 
 def import_time():
     warn('WARNING: USE AT YOUR OWN RISK. BY PROCEEDING YOU ACKNOWLEDGE THIS SOFTWARE IS EXPERIMENTAL AND FOR TESTING ONLY')
+    if is_access_token_valid() == False:
+        print('Please update the access token in the .env file and try again.')
+        exit()
     set_app()
     set_date_range()
     submit_time_entries()
@@ -51,8 +55,6 @@ def import_time():
 def set_app():
     global selected_app
     selected_app = 'cd_web'
-    if selected_app == 'cd_web' and False == confirm("Have you added your temporary access token to the .env file?"):
-        exit()
 
 def set_date_range():
     global from_date
@@ -252,6 +254,14 @@ def prepare_headers(data, url):
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
             "content-type": "application/json"
         }
+
+def is_access_token_valid():
+    decoded_token = jwt.decode(access_token, verify=False)
+    time_diff = decoded_token['exp'] - time.time()
+    dt_object = datetime.datetime.fromtimestamp(decoded_token['exp'])
+    verb = 'expires' if time_diff > 0 else 'expired'
+    print('Access token ' + verb + ' ' + timeago.format(dt_object))
+    return time_diff > 10 # We need at least 10 seconds left to proceed
 
 def generate_delta(data):
     decoded_token = jwt.decode(access_token, verify=False)
